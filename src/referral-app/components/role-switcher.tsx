@@ -21,8 +21,18 @@ const PERSONA_HOME: Record<string, string> = {
   INFLUENCER: "/influencer", CORPORATE_HR: "/corporate",
 };
 
-export function RoleSwitcher() {
-  const [open, setOpen] = useState(false);
+interface RoleSwitcherProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function RoleSwitcher({ open: controlledOpen, onOpenChange }: RoleSwitcherProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (next: boolean) => {
+    setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const { persona, setPersona } = useAppStore();
   const [, setLocation] = useLocation();
 

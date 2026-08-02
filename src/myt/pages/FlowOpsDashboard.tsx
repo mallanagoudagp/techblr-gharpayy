@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from '@/shims/react-router-dom';
 import { useAppState } from '@/myt/lib/app-context';
 import { MetricCard } from '@/myt/components/MetricCard';
@@ -12,6 +13,27 @@ import { CoachInline } from '@/components/CoachInline';
 import { TenXOpsBar, type TenXDigestItem } from '@/myt/components/TenXOpsBar';
 
 const CYCLE_TARGETS = { chatsClosed: 30, mytLeads: 10, toursScheduled: 4, sameDayConfirmed: 2 };
+const CYCLE_KEY = 'gharpayy.myt.flow-ops.cycles.v1';
+
+function loadCycles() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CYCLE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CycleData[];
+    return Array.isArray(parsed) && parsed.length === 4 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCycles(cycles: CycleData[]) {
+  try {
+    window.localStorage.setItem(CYCLE_KEY, JSON.stringify(cycles));
+  } catch {
+    // Ignore storage failures; the dashboard remains usable in-memory.
+  }
+}
 
 export default function FlowOpsDashboard() {
   const { tours, currentMemberId } = useAppState();
@@ -24,13 +46,17 @@ export default function FlowOpsDashboard() {
   const drafts = myTours.filter(t => t.outcome === 'draft').length;
   const pending = myTours.filter(t => t.status === 'scheduled').length;
 
-  const [cycles, setCycles] = useState<CycleData[]>([
+  const [cycles, setCycles] = useState<CycleData[]>(() => loadCycles() ?? [
     { cycleNumber: 1, chatsClosed: 0, mytLeads: 0, toursScheduled: 0, sameDayConfirmed: 0 },
     { cycleNumber: 2, chatsClosed: 0, mytLeads: 0, toursScheduled: 0, sameDayConfirmed: 0 },
     { cycleNumber: 3, chatsClosed: 0, mytLeads: 0, toursScheduled: 0, sameDayConfirmed: 0 },
     { cycleNumber: 4, chatsClosed: 0, mytLeads: 0, toursScheduled: 0, sameDayConfirmed: 0 },
   ]);
   const [activeCycle, setActiveCycle] = useState(0);
+
+  useEffect(() => {
+    saveCycles(cycles);
+  }, [cycles]);
 
   const updateCycle = (field: keyof CycleData, delta: number) => {
     setCycles(prev => prev.map((c, i) =>

@@ -17,6 +17,7 @@ import { SlotPicker, getTakenSlotsForDate } from '@/myt/components/SlotPicker';
 import { Building2, Video, Briefcase, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendTourMessage, logTourEvent } from '@/myt/lib/tour-messages';
+import { useLocation } from '@/shims/react-router-dom';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 const in7days = () => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; };
@@ -28,8 +29,9 @@ interface ScheduleTourProps {
 }
 
 export default function ScheduleTour({ onScheduled }: ScheduleTourProps = {}) {
-  const { tours, setTours, rooms, blocks, setBlocks } = useAppState();
+  const { tours, setTours, rooms, blocks, setBlocks, managedProperties, managedRooms } = useAppState();
   const { role, currentTcmId, tcms: storeTcms } = useApp();
+  const location = useLocation();
   const currentTcmName = storeTcms.find((t) => t.id === currentTcmId)?.name;
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -58,6 +60,23 @@ export default function ScheduleTour({ onScheduled }: ScheduleTourProps = {}) {
     tourTime: '',
     assignedTo: '', // empty = auto
   });
+
+  useEffect(() => {
+    const handoff = location.state as { lead?: { name?: string; phone?: string; area?: string; budget?: number; moveInDate?: string } } | null;
+    const lead = handoff?.lead;
+    if (!lead) return;
+
+    const zone = zones.find((z) => z.area === lead.area || lead.area?.toLowerCase().includes(z.area.toLowerCase()));
+    setForm((current) => ({
+      ...current,
+      leadName: lead.name ?? current.leadName,
+      phone: lead.phone ?? current.phone,
+      budget: lead.budget ? String(lead.budget) : current.budget,
+      moveInDate: lead.moveInDate ?? current.moveInDate,
+      zoneId: zone?.id ?? current.zoneId,
+    }));
+    setStep(1);
+  }, [location.state]);
 
   // When the current user is a TCM, default-assign them as the host.
   useEffect(() => {
@@ -99,11 +118,19 @@ export default function ScheduleTour({ onScheduled }: ScheduleTourProps = {}) {
 
   const canSubmit = form.leadName && form.phone && form.propertyName && form.tourTime && effectiveTcm;
 
+  const selectableProperties = useMemo(
+    () => [...managedProperties, ...allProperties],
+    [managedProperties],
+  );
+
   const handleSubmit = () => {
     if (!effectiveTcm) { toast.error('No TCM available'); return; }
     if (!form.tourTime) { toast.error('Pick a slot'); return; }
 
     const zone = zones.find(z => z.id === form.zoneId)!;
+    const matchingProp = selectableProperties.find(
+      p => p.name === form.propertyName && p.zoneId === form.zoneId,
+    );
     const newTour: Tour = {
       id: `t${Date.now()}`,
       leadName: form.leadName,
@@ -111,6 +138,7 @@ export default function ScheduleTour({ onScheduled }: ScheduleTourProps = {}) {
       assignedTo: effectiveTcm.id,
       assignedToName: effectiveTcm.name,
       propertyName: form.propertyName,
+      propertyId: matchingProp?.id,
       area: zone.area,
       zoneId: form.zoneId,
       tourDate: form.tourDate,
@@ -137,10 +165,11 @@ export default function ScheduleTour({ onScheduled }: ScheduleTourProps = {}) {
     setTours(prev => [newTour, ...prev]);
 
     // Auto room block based on intent
-    const matchingProp = allProperties.find(p => p.name === form.propertyName && p.zoneId === form.zoneId);
     if (matchingProp) {
-      const tourWithProp = { ...newTour, propertyId: matchingProp.id };
-      const block = createBlockForTour(tourWithProp, rooms, blocks);
+      const propertyRooms = managedProperties.some(p => p.id === matchingProp.id)
+        ? managedRooms
+        : rooms;
+      const block = createBlockForTour(newTour, propertyRooms, blocks);
       if (block) {
         setBlocks(prev => [block, ...prev]);
         toast.success(`${intent.toUpperCase()} tour → ${effectiveTcm.name} · Room held ${intent === 'hard' ? '4h' : '1h'}`);
@@ -370,7 +399,7 @@ export default function ScheduleTour({ onScheduled }: ScheduleTourProps = {}) {
               <Label className={labelCls}>Property</Label>
               <select value={form.propertyName} onChange={e => setForm(f => ({ ...f, propertyName: e.target.value }))} className={select}>
                 <option value="">Select property…</option>
-                {allProperties.filter(p => p.zoneId === form.zoneId).map(p => (
+                {selectableProperties.filter(p => p.zoneId === form.zoneId).map(p => (
                   <option key={p.id} value={p.name}>{p.name} · ₹{(p.basePrice/1000).toFixed(0)}k</option>
                 ))}
               </select>

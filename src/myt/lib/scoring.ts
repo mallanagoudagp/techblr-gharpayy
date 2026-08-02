@@ -21,7 +21,7 @@ function demandScore(p: Property, leads: Lead[]): number {
  */
 function conversionScore(p: Property, tours: Tour[]): number {
   const propertyTours = tours.filter(t => t.propertyName === p.name);
-  if (propertyTours.length === 0) return 50; // unknown — neutral
+  if (propertyTours.length === 0) return 0;
   const completed = propertyTours.filter(t => t.status === 'completed').length;
   const bookings = propertyTours.filter(
     t => t.outcome === 'booked' || t.outcome === 'token-paid' || t.tokenPaid

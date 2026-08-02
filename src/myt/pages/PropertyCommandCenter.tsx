@@ -5,7 +5,7 @@ import { PropertyCard } from '@/myt/components/PropertyCard';
 import { SignalChip } from '@/myt/components/SignalChip';
 import { UrgencyTimer } from '@/myt/components/UrgencyTimer';
 import { zones } from '@/myt/lib/mock-data';
-import { Search, Building2, Lock, Plus, Sparkles } from 'lucide-react';
+import { Search, Building2, Cloud, CloudOff, Loader2, Lock, Plus, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -32,10 +32,15 @@ const emptyRoomDraft = (price = 8000): RoomDraft => ({
 
 export default function PropertyCommandCenter() {
   const {
-    tours, leads, blocks, globalZoneFilter,
+    tours, blocks, commandCenterSyncStatus, globalZoneFilter,
     managedProperties, setManagedProperties,
     managedRooms, setManagedRooms,
   } = useAppState();
+
+  const liveBlocks = useMemo(
+    () => blocks.filter((block) => !block.id.startsWith('blk-seed-')),
+    [blocks],
+  );
 
   const [search, setSearch] = useState('');
   const [signalFilter, setSignalFilter] = useState<'all' | 'hot' | 'balanced' | 'cold'>('all');
@@ -44,15 +49,33 @@ export default function PropertyCommandCenter() {
 
   const scoredProps = useMemo(() => {
     return managedProperties
-      .map(p => ({ p, s: scoreProperty(p, managedRooms, tours, leads, blocks) }))
+      .map(p => ({
+        p,
+        // Only activity explicitly associated with this user-created property
+        // belongs in Command Center metrics. The app-wide demo tours and leads
+        // intentionally have no propertyId, so they cannot affect this view.
+        s: scoreProperty(
+          p,
+          managedRooms,
+          tours.filter(t => t.propertyId === p.id),
+          [],
+          liveBlocks,
+        ),
+      }))
       .filter(({ p }) => !globalZoneFilter || p.zoneId === globalZoneFilter)
       .filter(({ p }) => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.area.toLowerCase().includes(search.toLowerCase()))
       .filter(({ s }) => signalFilter === 'all' || s.signal === signalFilter)
       .sort((a, b) => b.s.demandScore - a.s.demandScore);
-  }, [managedProperties, managedRooms, tours, leads, blocks, globalZoneFilter, search, signalFilter]);
+  }, [managedProperties, managedRooms, tours, liveBlocks, globalZoneFilter, search, signalFilter]);
 
   const totals = useMemo(() => {
-    const all = managedProperties.map(p => scoreProperty(p, managedRooms, tours, leads, blocks));
+    const all = managedProperties.map(p => scoreProperty(
+      p,
+      managedRooms,
+      tours.filter(t => t.propertyId === p.id),
+      [],
+      liveBlocks,
+    ));
     return {
       hot: all.filter(s => s.signal === 'hot').length,
       cold: all.filter(s => s.signal === 'cold').length,
@@ -60,7 +83,7 @@ export default function PropertyCommandCenter() {
       missed: all.reduce((sum, s) => sum + s.missedRevenue, 0),
       blockedBeds: all.reduce((sum, s) => sum + s.bedsBlocked, 0),
     };
-  }, [managedProperties, managedRooms, tours, leads, blocks]);
+  }, [managedProperties, managedRooms, tours, liveBlocks]);
 
   const handleCreate = (property: Property, rooms: Room[]) => {
     setManagedProperties(prev => [...prev, property]);
@@ -82,6 +105,7 @@ export default function PropertyCommandCenter() {
           <p className="text-xs text-muted-foreground">
             Live demand, conversion & velocity — populated from your real properties.
           </p>
+          <SyncIndicator status={commandCenterSyncStatus} />
         </div>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
@@ -151,6 +175,23 @@ export default function PropertyCommandCenter() {
       {selected && (
         <PropertyDrawer property={selected} onClose={() => setSelected(null)} />
       )}
+    </div>
+  );
+}
+
+function SyncIndicator({ status }: { status: import('@/myt/lib/app-context').SyncStatus }) {
+  const content = status === 'saving'
+    ? { icon: Loader2, label: 'Saving…', className: 'text-muted-foreground' }
+    : status === 'offline'
+      ? { icon: CloudOff, label: 'Offline — saved locally', className: 'text-warning' }
+      : status === 'loading'
+        ? { icon: Loader2, label: 'Loading saved data…', className: 'text-muted-foreground' }
+        : { icon: Cloud, label: 'Saved to cloud', className: 'text-role-tcm' };
+  const Icon = content.icon;
+  return (
+    <div className={cn('mt-1 flex items-center gap-1 text-[11px]', content.className)}>
+      <Icon className={cn('h-3 w-3', status === 'saving' || status === 'loading' ? 'animate-spin' : '')} />
+      {content.label}
     </div>
   );
 }
@@ -345,11 +386,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function PropertyDrawer({ property, onClose }: { property: Property; onClose: () => void }) {
-  const { tours, leads, blocks, managedRooms } = useAppState();
-  const scores = scoreProperty(property, managedRooms, tours, leads, blocks);
+  const { tours, blocks, managedRooms } = useAppState();
+  const propertyTours = tours.filter(t => t.propertyId === property.id);
+  const liveBlocks = blocks.filter((block) => !block.id.startsWith('blk-seed-'));
+  const scores = scoreProperty(property, managedRooms, propertyTours, [], liveBlocks);
   const propRooms = managedRooms.filter(r => r.propertyId === property.id);
-  const activeBlocks = blocks.filter(b => b.propertyId === property.id && b.status === 'active' && new Date(b.expiresAt).getTime() > Date.now());
-  const recentTours = tours.filter(t => t.propertyName === property.name).slice(0, 5);
+  const activeBlocks = liveBlocks.filter(b => b.propertyId === property.id && b.status === 'active' && new Date(b.expiresAt).getTime() > Date.now());
+  const recentTours = propertyTours.slice(0, 5);
 
   return (
     <div className="fixed inset-0 z-50 flex md:items-center md:justify-center" onClick={onClose}>
@@ -430,8 +473,6 @@ function PropertyDrawer({ property, onClose }: { property: Property; onClose: ()
             </div>
           )}
 
-          {/* Unused props reference for ts-noUnusedLocals */}
-          <span className="hidden">{leads.length}</span>
         </div>
       </div>
     </div>

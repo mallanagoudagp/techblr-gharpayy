@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAppStore } from "@/referral-app/lib/store";
 import { Home, PlusCircle, Trophy, User, LogOut, Building2, Users, Target, Bell, Calculator, MapPin, BarChart2, Flame, Zap, GitBranch, Activity, Share2, TrendingUp, Calendar, SwitchCamera } from "lucide-react";
@@ -8,6 +9,7 @@ import { RoleSwitcher } from "./role-switcher";
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { persona, logout } = useAppStore();
+  const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -117,7 +119,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="p-4 border-t border-border/10 space-y-1">
           <button
-            onClick={() => {}}
+            onClick={() => setRoleSwitcherOpen(true)}
             className="flex items-center gap-3 px-4 py-2 w-full text-left text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-md"
             title="Switch Role"
           >
@@ -174,7 +176,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Floating Role Switcher */}
-      <RoleSwitcher />
+      <RoleSwitcher open={roleSwitcherOpen} onOpenChange={setRoleSwitcherOpen} />
     </div>
   );
 }

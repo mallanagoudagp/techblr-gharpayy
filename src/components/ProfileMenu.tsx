@@ -9,6 +9,7 @@
  *
  * This keeps power-user actions one click away from any screen.
  */
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   DropdownMenu,
@@ -38,6 +39,9 @@ import {
   Target,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { AccountSettingsDialog } from "@/components/AccountSettingsDialog";
+import { supabase } from "@/lib/supabase";
 
 const ROLE_META = {
   "flow-ops": { label: "Flow Ops", dot: "bg-info", initials: "FO", icon: Target },
@@ -50,10 +54,31 @@ const ROLE_META = {
 export function ProfileMenu() {
   const { role, setRole, currentTcmId, setCurrentTcmId, tcms } = useApp();
   const navigate = useNavigate();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const updateAccount = async () => {
+      const { data } = await supabase.auth.getUser();
+      setAccountEmail(data.user?.is_anonymous ? null : data.user?.email ?? null);
+    };
+    void updateAccount();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => { void updateAccount(); });
+    return () => listener.subscription.unsubscribe();
+  }, []);
   const meta = ROLE_META[role];
   const tcm = role === "tcm" ? tcms.find((t) => t.id === currentTcmId) : null;
   const initials = tcm?.initials ?? meta.initials;
   const displayName = tcm?.name ?? meta.label;
+  const signOut = async () => {
+    if (!supabase) return toast.error('Supabase is not configured');
+    const { error } = await supabase.auth.signOut();
+    if (error) return toast.error(error.message);
+    setAccountEmail(null);
+    toast.success('Signed out. This browser will use a new private session.');
+  };
 
   return (
     <DropdownMenu>
@@ -73,7 +98,7 @@ export function ProfileMenu() {
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{displayName}</div>
-            <div className="text-[11px] text-muted-foreground">{meta.label}</div>
+            <div className="text-[11px] text-muted-foreground">{accountEmail ?? meta.label}</div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -131,10 +156,23 @@ export function ProfileMenu() {
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => toast.info("Sign out is local-only in this build.")}>
-          <LogOut className="mr-2 h-4 w-4" /> Sign out
-        </DropdownMenuItem>
+        {!accountEmail ? (
+          <DropdownMenuItem onSelect={() => setAuthOpen(true)}>
+            <UserRound className="mr-2 h-4 w-4" /> Sign in to sync
+          </DropdownMenuItem>
+        ) : (
+          <>
+            <DropdownMenuItem onSelect={() => setAccountSettingsOpen(true)}>
+              <UserRound className="mr-2 h-4 w-4" /> Account settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { void signOut(); }}>
+              <LogOut className="mr-2 h-4 w-4" /> Sign out
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
+      <SupabaseAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
+      <AccountSettingsDialog open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
     </DropdownMenu>
   );
 }

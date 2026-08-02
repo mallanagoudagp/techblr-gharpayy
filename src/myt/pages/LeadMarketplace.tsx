@@ -52,8 +52,8 @@ export default function LeadMarketplace() {
   };
 
   const scheduleFromLead = (l: Lead) => {
-    navigate('/myt/schedule');
-    toast.info(`Pre-fill: ${l.name} · ₹${l.budget} · ${l.area}`);
+    navigate('/myt/schedule', { state: { lead: l } });
+    toast.info(`Pre-filled schedule for ${l.name}`);
   };
 
   const summary = {
