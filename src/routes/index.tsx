@@ -3,7 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { useApp, computePropertyMetrics } from "@/lib/store";
 import { KpiCard } from "@/components/atoms";
 import { format } from "date-fns";
-import { AlertTriangle, ArrowUpRight, CalendarPlus, Flame, Building2, Zap, Sun, TrendingUp, Sparkles, IndianRupee } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarPlus, Flame, Building2, Zap, Sun, TrendingUp, Sparkles, IndianRupee, Brain, Radio, Activity } from "lucide-react";
 import { useMemo } from "react";
 import { useMountedNow } from "@/hooks/use-now";
 import { buildDoNextQueue, liveConfidence, intentFor } from "@/lib/engine";
@@ -224,6 +224,9 @@ function DashboardPage() {
           </section>
         )}
 
+        {/* Why Gharpayy — Feature highlights */}
+        <WhyGharpayy />
+
         {/* Inventory pressure */}
         <Card title="Inventory pressure" icon={Building2} action={<Link to="/inventory" className="text-xs text-accent inline-flex items-center gap-1">All properties <ArrowUpRight className="h-3 w-3" /></Link>}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -254,6 +257,142 @@ function DashboardPage() {
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+/* ─── Why Gharpayy — 3-Feature Section ─────────────────────────────────── */
+const FEATURES = [
+  {
+    id: "live-lead-scoring",
+    icon: Zap,
+    badge: "Feature 01",
+    title: "Live Lead Scoring",
+    tagline: "Every lead has a heartbeat. We track it.",
+    description:
+      "Gharpayy's proprietary confidence-decay engine scores every lead in real time — factoring in recency, tour outcomes, follow-up gaps, and engagement velocity. Hot leads rise. Cold ones surface for revival. No stale CRM data, ever.",
+    uniqueness: "Unlike static pipelines, scores decay automatically every minute — so your team always works the right lead at the right time, without manual triage.",
+    stat: "78%",
+    statLabel: "avg score accuracy vs. actual bookings",
+    tone: "accent" as const,
+    link: "/leads" as const,
+    linkLabel: "Open Leads",
+  },
+  {
+    id: "visit-war-room",
+    icon: Radio,
+    badge: "Feature 02",
+    title: "Visit War Room",
+    tagline: "Every tour. Live. Tracked. Enforced.",
+    description:
+      "The Visit War Room gives Flow Ops a live satellite view of every property tour happening across the city — check-in timestamps, TCM notes, post-tour form completion, and SLA breach alerts. Nothing slips through.",
+    uniqueness: "Automated 6-hour escalation timers ensure post-tour forms are never skipped. The industry average is 40% missing — Gharpayy teams hit 95%+ completion.",
+    stat: "95%",
+    statLabel: "post-tour form completion rate",
+    tone: "info" as const,
+    link: "/visit-war" as const,
+    linkLabel: "Open War Room",
+  },
+  {
+    id: "ai-coach",
+    icon: Brain,
+    badge: "Feature 03",
+    title: "AI Coach",
+    tagline: "Your smartest team member. Always on.",
+    description:
+      "The Gharpayy AI Coach automatically spots stale leads, generates revival scripts, suggests next-best-actions, and runs engagement sequences — all without your team lifting a finger. It learns from your data, not generic playbooks.",
+    uniqueness: "Revival sequences re-engage leads that went cold 7–30 days ago, recovering an average 12% additional bookings per month — revenue that would otherwise be permanently lost.",
+    stat: "+12%",
+    statLabel: "bookings recovered via AI revival",
+    tone: "success" as const,
+    link: "/coach" as const,
+    linkLabel: "Open Coach",
+  },
+] as const;
+
+type FeatureTone = "accent" | "info" | "success";
+
+const TONE_MAP: Record<FeatureTone, { badge: string; stat: string; bar: string; border: string; bg: string; glow: string }> = {
+  accent:  { badge: "bg-accent/10 text-accent border-accent/20",        stat: "text-accent",        bar: "bg-accent",       border: "border-accent/20",   bg: "bg-accent/5",   glow: "shadow-accent/10" },
+  info:    { badge: "bg-info/10 text-info border-info/20",              stat: "text-info",          bar: "bg-info",         border: "border-info/20",     bg: "bg-info/5",     glow: "shadow-info/10" },
+  success: { badge: "bg-success/10 text-success border-success/20",    stat: "text-success",      bar: "bg-success",     border: "border-success/20",  bg: "bg-success/5",  glow: "shadow-success/10" },
+};
+
+function WhyGharpayy() {
+  return (
+    <section className="space-y-4">
+      {/* Section header */}
+      <header className="flex items-end justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-block h-px w-8 bg-accent" />
+            <span className="text-[10px] uppercase tracking-widest text-accent font-semibold font-mono">Why Gharpayy</span>
+          </div>
+          <h2 className="font-display text-xl font-semibold tracking-tight">Built different. Built for closers.</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Three unfair advantages powering your deal flow.</p>
+        </div>
+        <Activity className="h-5 w-5 text-muted-foreground/40" />
+      </header>
+
+      {/* Feature cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {FEATURES.map((f) => {
+          const Icon = f.icon;
+          const t = TONE_MAP[f.tone];
+          return (
+            <div
+              key={f.id}
+              className={`relative rounded-xl border ${t.border} ${t.bg} bg-card overflow-hidden flex flex-col shadow-sm hover:shadow-md ${t.glow} transition-all duration-300 group`}
+            >
+              {/* Top accent bar */}
+              <div className={`h-0.5 w-full ${t.bar}`} />
+
+              <div className="p-5 flex flex-col flex-1 gap-4">
+                {/* Badge + icon row */}
+                <div className="flex items-start justify-between">
+                  <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${t.badge}`}>
+                    {f.badge}
+                  </span>
+                  <div className={`h-9 w-9 rounded-lg ${t.bg} border ${t.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className={`h-4 w-4 ${t.stat}`} />
+                  </div>
+                </div>
+
+                {/* Title + tagline */}
+                <div>
+                  <h3 className="font-display text-base font-semibold leading-tight">{f.title}</h3>
+                  <p className={`text-xs font-medium mt-0.5 ${t.stat}`}>{f.tagline}</p>
+                </div>
+
+                {/* Description */}
+                <p className="text-xs text-muted-foreground leading-relaxed flex-1">{f.description}</p>
+
+                {/* Uniqueness callout */}
+                <div className={`rounded-lg border ${t.border} ${t.bg} p-3`}>
+                  <div className="flex items-start gap-2">
+                    <Sparkles className={`h-3.5 w-3.5 ${t.stat} shrink-0 mt-0.5`} />
+                    <p className="text-[11px] text-muted-foreground leading-snug">{f.uniqueness}</p>
+                  </div>
+                </div>
+
+                {/* Stat + CTA */}
+                <div className="flex items-end justify-between mt-auto pt-1">
+                  <div>
+                    <div className={`font-display text-2xl font-bold tabular-nums ${t.stat}`}>{f.stat}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight max-w-[140px]">{f.statLabel}</div>
+                  </div>
+                  <Link
+                    to={f.link}
+                    className={`inline-flex items-center gap-1 text-xs font-medium ${t.stat} hover:underline underline-offset-2`}
+                  >
+                    {f.linkLabel} <ArrowUpRight className="h-3 w-3" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
